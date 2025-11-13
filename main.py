@@ -438,17 +438,25 @@ async def on_message(message):
                         config,
                     )
                     # Se a chamada foi bem-sucedida, saia do loop
+                    if not response.candidates:
+                        raise types.StopCandidateException("A resposta não continha candidatos.")
                     break
                 except Exception as e:
-                    # Verifica se o erro é o específico de sobrecarga (503)
-                    if "503" in str(e) and "model is overloaded" in str(e).lower():
+                    # Verifica se o erro é relacionado à sobrecarga do modelo, segurança ou resposta vazia
+                    error_str = str(e).lower()
+                    is_retryable = (
+                        "503" in error_str and "model is overloaded" in error_str
+                    ) or "safety" in error_str or "resource has been exhausted" in error_str or "service unavailable" in error_str or "candidates" in error_str
+
+                    if is_retryable:
                         # Se não for a última tentativa, espere e tente novamente
                         if attempt < max_retries - 1:
                             wait_time = base_wait_time * (2 ** attempt)  # Exponential backoff: 2s, 4s
-                            await message.channel.send(f"eu estou meio ocupado no momento, tentando de novo em {wait_time} segundos... ({attempt + 2}/{max_retries})")
+                            error_reason = "sobrecarga" if "503" in error_str else "um filtro de segurança" if "safety" in error_str else "outro problema"
+                            await message.channel.send(f"tive um problema com {error_reason}, tentando de novo em {wait_time} segundos... ({attempt + 2}/{max_retries})")
                             await asyncio.sleep(wait_time)
                         else:
-                            await message.reply(f"Desculpe, o modelo do google parece estar sobrecarregado no momento. tentei {max_retries} vezes e não rolou. 😔")
+                            await message.reply(f"desculpe, não consegui uma resposta do modelo. tentei {max_retries} vezes e não rolou. 😔")
                             return
                     else:
                         await message.reply(f"{e}")

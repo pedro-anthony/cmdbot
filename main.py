@@ -11,7 +11,6 @@ import pytz
 
 from PIL import Image
 from collections import deque
-from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
 # Discord.py and Async
@@ -23,7 +22,7 @@ import aiohttp
 from google import genai 
 from google.genai import types
 
-sao_paulo_tz = ZoneInfo("America/Sao_Paulo")
+sao_paulo_tz = pytz.timezone("America/Sao_Paulo")
 
 load_dotenv()
 

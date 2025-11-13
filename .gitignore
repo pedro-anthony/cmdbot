@@ -1,3 +1,7 @@
+# Application specific
+knowledge.json
+message_cache.pkl
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -1,7 +1,7 @@
 [project]
 name = "cmdbot"
 version = "0.1.0"
-description = ""
+description = "código principal do interpretador e bot discord do cmdBOT"
 authors = [
     {name = "Pedro",email = "wrenchwastaken@gmail.com"}
 ]

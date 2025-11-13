@@ -1,26 +1,29 @@
 # Core Stuff
-import os
-import datetime
-import time
-import json
-import io
-import asyncio
-import pickle
 import atexit
+import asyncio
+import colorama
+import datetime
+import io
+import json
+import os
+import pickle
 import pytz
+import time
 
 from PIL import Image
 from collections import deque
 from dotenv import load_dotenv
 
 # Discord.py and Async
+import aiohttp
 import discord
 from discord.ext import commands, tasks
-import aiohttp
 
 # Gemini API
 from google import genai 
 from google.genai import types
+
+colorama.init(autoreset=True)
 
 sao_paulo_tz = pytz.timezone("America/Sao_Paulo")
 
@@ -71,7 +74,7 @@ def load_cache():
     """Carrega o cache de mensagens (dicionário de deques) do arquivo."""
     global message_cache
     if os.path.exists(CACHE_FILE):
-        print(f"Loading message cache from {CACHE_FILE}...")
+        print(colorama.Fore.YELLOW + f"Loading message cache from {CACHE_FILE}...")
         try:
             with open(CACHE_FILE, 'rb') as f:
                 loaded_cache = pickle.load(f)
@@ -79,15 +82,15 @@ def load_cache():
                     message_cache = loaded_cache
                     for channel_id in message_cache:
                         message_cache[channel_id] = deque(message_cache[channel_id], maxlen=LLM_CONTEXT_SIZE)
-                    print(f"Cache loaded successfully for {len(message_cache)} channels.")
+                    print(colorama.Fore.GREEN + f"Cache loaded successfully for {len(message_cache)} channels.")
                 else:
-                    print("Old cache format detected. Starting with an empty cache.")
+                    print(colorama.Fore.RED + "Old cache format detected. Starting with an empty cache.")
                     message_cache = {}
         except Exception as e:
-            print(f"Error loading cache: {e}. Starting with empty cache.")
+            print(colorama.Fore.RED + f"Error loading cache: {e}. Starting with empty cache.")
             message_cache = {}
     else:
-        print("Cache file not found. Starting with empty cache.")
+        print(colorama.Fore.YELLOW + "Cache file not found. Starting with empty cache.")
         message_cache = {}
 
 def save_cache():
@@ -98,23 +101,23 @@ def save_cache():
             with open(CACHE_FILE, 'wb') as f:
                 pickle.dump(message_cache, f)
         except Exception as e:
-            print(f"Error saving cache: {e}")
+            print(colorama.Fore.RED + f"Error saving cache: {e}")
 
 def load_knowledge_base():
     """Carrega a base de conhecimento do arquivo JSON."""
     global knowledge_base
     if os.path.exists(KNOWLEDGE_FILE):
-        print(f"Loading knowledge base from {KNOWLEDGE_FILE}...")
+        print(colorama.Fore.YELLOW + f"Loading knowledge base from {KNOWLEDGE_FILE}...")
         try:
             with open(KNOWLEDGE_FILE, 'r', encoding='utf-8') as f:
                 knowledge_base = json.load(f)
-                print("Knowledge base loaded successfully.")
+                print(colorama.Fore.GREEN + "Knowledge base loaded successfully.")
         except json.JSONDecodeError as e:
-            print(f"Error decoding knowledge base JSON: {e}. Using empty base.")
+            print(colorama.Fore.RED + f"Error decoding knowledge base JSON: {e}. Using empty base.")
         except Exception as e:
-            print(f"Error loading knowledge base: {e}. Using empty base.")
+            print(colorama.Fore.RED + f"Error loading knowledge base: {e}. Using empty base.")
     else:
-        print("Knowledge base file not found. Starting with empty base.")
+        print(colorama.Fore.YELLOW + "Knowledge base file not found. Starting with empty base.")
 
 def format_knowledge_for_prompt() -> str:
     """Formata a base de conhecimento global em uma string para o prompt do LLM."""
@@ -239,7 +242,7 @@ async def update_presence_from_history():
     try:
         # 1. Find the most recently active channel from our cache
         if not message_cache:
-            print("Presence Task: No message history available yet.")
+            print(colorama.Fore.YELLOW + "Presence Task: No message history available yet.")
             return
 
         # Find the channel_id with the most recent 'last_updated' timestamp
@@ -259,7 +262,7 @@ async def update_presence_from_history():
         Baseado no histórico de conversa a seguir, e nas suas instruções de sistema, gere um "Status" para o Bot no Discord
         O status deve descrever o que o bot está "fazendo" ou "pensando" de uma forma divertida e concisa (menos de 100 caracteres).
         Faça isso baseado na conversa/mensagens mais recentes disponíveis no histórico
-        Comece com um verbo (por exemplo, "Organizando...", "Pensando em...", "Calculando...").
+        Comece com um verbo (por exemplo, "organizando...", "pensando em...", "calculando...").
         Não utilize aspas na sua resposta. Forneça apenas o texto original do status.
         NÃO UTILIZE NENHUM EMOJI NA SUA RESPOSTA.
 
@@ -274,7 +277,7 @@ async def update_presence_from_history():
         # 4. Call the Gemini API
         response = await asyncio.get_event_loop().run_in_executor(
             None,
-            generate_content_sync, # Assuming this is your synchronous API call function
+            generate_content_sync,
             status_prompt,
             types.GenerateContentConfig(
                 safety_settings = [
@@ -302,7 +305,7 @@ async def update_presence_from_history():
             await bot.change_presence(activity=new_activity)
 
     except Exception as e:
-        print(f"Presence Task: An error occurred: {e}")
+        print(colorama.Fore.RED + f"Presence Task: An error occurred: {e}")
 
 # This decorator ensures the task doesn't start until the bot is fully logged in.
 @update_presence_from_history.before_loop
@@ -311,11 +314,11 @@ async def before_update_presence():
 
 @bot.event
 async def on_ready():
-    print(f'Logged in as {bot.user}!') 
-    print(f'Message cache size set to: {GLOBAL_CACHE_SIZE}')
-    general_count = sum(len(d) for d in knowledge_base.get("generalKnowledge", []))
-    member_count = len(knowledge_base.get("memberSpecific", []))
-    print(f'Knowledge base loaded: {general_count} general, {member_count} member profiles.')
+    print(colorama.Fore.GREEN + f'Logged in as {bot.user}!') 
+    print(colorama.Fore.CYAN + f'Message cache size set to: {GLOBAL_CACHE_SIZE}')
+    general_count = sum(len(d) for d in knowledge_base.get("generalKnowledge", [])) # type: ignore
+    member_count = len(knowledge_base.get("memberSpecific", [])) # type: ignore
+    print(colorama.Fore.CYAN + f'Knowledge base loaded: {general_count} general, {member_count} member profiles.')
 
     if not update_presence_from_history.is_running():
         update_presence_from_history.start()
@@ -401,9 +404,9 @@ async def on_message(message):
                                         pil_image = Image.open(io.BytesIO(image_bytes))
                                         prompt_parts.append(pil_image)
                                     else:
-                                        print(f"Failed to download image: {attachment.url}")
+                                        print(colorama.Fore.RED + f"Failed to download image: {attachment.url}")
                             except Exception as e:
-                                print(f"Error processing image {attachment.url}: {e}")
+                                print(colorama.Fore.RED + f"Error processing image {attachment.url}: {e}")
 
             
 

@@ -419,6 +419,18 @@ files = [
 ]
 
 [[package]]
+name = "colorama"
+version = "0.4.6"
+description = "Cross-platform colored terminal text."
+optional = false
+python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
+groups = ["main"]
+files = [
+    {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
+    {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
+]
+
+[[package]]
 name = "discord"
 version = "2.3.2"
 description = "A mirror package for discord.py. Please install that instead."
@@ -1666,4 +1678,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.14"
-content-hash = "e6fd5451c382b5fa761ce9411b8e7d0e43bee2afbcede5514f09b75c166e7eb5"
+content-hash = "05efb18b1db5c17ed0f15d915f634341e8cf1261e26ff18e6018681af87a6d53"

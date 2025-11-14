@@ -31,7 +31,6 @@ load_dotenv()
 
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-BOT_NAMES = ("cmdbot", "cmddroid")
 
 CACHE_FILE = 'message_cache.pkl'
 KNOWLEDGE_FILE = 'knowledge.json'
@@ -347,7 +346,7 @@ async def on_message(message):
         return
 
     is_mentioned = bot.user.mentioned_in(message)
-    contains_name = any(name in message.content.lower() for name in BOT_NAMES)
+    contains_name = any("cmdbot" in message.content.lower())
 
     if not is_mentioned and not contains_name:
         return

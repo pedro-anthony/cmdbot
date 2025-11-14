@@ -237,7 +237,7 @@ bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 load_cache()
 load_knowledge_base()
 
-@tasks.loop(minutes=15)
+@tasks.loop(minutes=20)
 async def update_presence_from_history():
     """A background task that updates the bot's presence based on recent chat history."""
     try:
@@ -328,7 +328,6 @@ async def on_ready():
 async def on_message(message):
     await bot.process_commands(message)
 
-    #  --- Bloco de Cache Otimizado (Escrita) ---
     if message.channel.id not in message_cache:
         message_cache[message.channel.id] = deque(maxlen=LLM_CONTEXT_SIZE)
 
@@ -358,7 +357,7 @@ async def on_message(message):
             t0 = time.monotonic() # Start total processing timer
 
             channel_deque = message_cache.get(message.channel.id, deque())
-            context_messages = list(reversed(channel_deque))
+            context_messages = list(channel_deque)
             
             history_strings = []
             for msg_data in context_messages:

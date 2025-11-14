@@ -452,12 +452,11 @@ async def on_message(message):
                         or "resource has been exhausted" in error_str 
                         or "service unavailable" in error_str 
                         or "prohibited_content" in error_str
-                        or "estava vazia" in error_str # Catches our custom empty response error
                     )
                     
                     if is_retryable and attempt < max_retries - 1:
                         wait_time = base_wait_time * (2 ** attempt)  # Exponential backoff: 2s, 4s
-                        error_reason = "sobrecarga" if "503" in error_str else "um filtro de segurança" if "safety" in error_str else "outro problema"
+                        error_reason = "sobrecarga" if "503" in error_str else "um filtro de segurança" if "safety" in error_str else "a resposta"
                         await message.channel.send(f"tive um problema com {error_reason}, tentando de novo em {wait_time} segundos... ({attempt + 1}/{max_retries})")
                         await asyncio.sleep(wait_time)
                     else:

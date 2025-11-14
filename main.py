@@ -72,7 +72,7 @@ Sua tarefa é responder às mensagens dos usuários em um chat do Discord, consi
 """
 
 def load_cache():
-    """Carrega o cache de mensagens (dicionário de deques) do arquivo."""
+    """Loads the message cache (dictionary of deques) from the file."""
     global message_cache
     if os.path.exists(CACHE_FILE):
         print(colorama.Fore.YELLOW + f"Loading message cache from {CACHE_FILE}...")
@@ -95,7 +95,7 @@ def load_cache():
         message_cache = {}
 
 def save_cache():
-    """Salva o cache de mensagens (dicionário de deques) no arquivo."""
+    """Saves the message cache (dictionary of deques) to the file."""
     if message_cache:
         total_messages = sum(len(d) for d in message_cache.values()) # type: ignore
         try:
@@ -105,7 +105,7 @@ def save_cache():
             print(colorama.Fore.RED + f"Error saving cache: {e}")
 
 def load_knowledge_base():
-    """Carrega a base de conhecimento do arquivo JSON."""
+    """Loads the knowledge base from the JSON file."""
     global knowledge_base
     if os.path.exists(KNOWLEDGE_FILE):
         print(colorama.Fore.YELLOW + f"Loading knowledge base from {KNOWLEDGE_FILE}...")
@@ -121,7 +121,7 @@ def load_knowledge_base():
         print(colorama.Fore.YELLOW + "Knowledge base file not found. Starting with empty base.")
 
 def format_knowledge_for_prompt() -> str:
-    """Formata a base de conhecimento global em uma string para o prompt do LLM."""
+    """Formats the global knowledge base into a string for the LLM prompt."""
     knowledge_str = []
     
     if knowledge_base.get("generalKnowledge"):
@@ -160,6 +160,7 @@ def format_knowledge_for_prompt() -> str:
     return "\n".join(knowledge_str)
         
 def generate_content_sync(contents, config):
+    """Synchronously generates content using the Gemini API."""
     return gemini_client.models.generate_content(
         model=MODEL_NAME,
         contents=contents,
@@ -168,29 +169,29 @@ def generate_content_sync(contents, config):
 
 def sanitize_bot_response(text: str) -> str:
     """
-    Remove o rodapé de métricas e fontes da resposta do bot antes de salvá-la no histórico.
-    O rodapé é identificado por começar com uma linha contendo '-#'.
+    Removes the metrics and sources footer from the bot's response before saving it to history.
+    The footer is identified by starting with a line containing '-#'.
     """
     lines = text.splitlines()
     
-    # Encontra o índice da primeira linha do rodapé (que começa com '-#')
+    # Find the index of the first footer line (which starts with '-#')
     first_footer_line_index = -1
     for i, line in enumerate(lines):
         if line.strip().startswith("-#"):
             first_footer_line_index = i
             break
             
-    # Se um rodapé foi encontrado, retorne apenas as linhas antes dele
+    # If a footer was found, return only the lines before it
     if first_footer_line_index != -1:
-        # Pega todas as linhas ANTES do rodapé e as junta novamente
+        # Get all lines BEFORE the footer and join them again
         clean_lines = lines[:first_footer_line_index]
         return "\n".join(clean_lines).strip()
     
-    # Se nenhum rodapé foi encontrado, retorne o texto original
+    # If no footer was found, return the original text
     return text
 
 def message_to_cache_data(message: discord.Message) -> dict:
-    """Converte um objeto discord.Message para um dicionário para o cache."""
+    """Converts a discord.Message object to a dictionary for the cache."""
     
     content = message.content
     
@@ -198,7 +199,7 @@ def message_to_cache_data(message: discord.Message) -> dict:
     if message.attachments:
         # Se houver texto, adiciona um espaço antes do placeholder.
         if content:
-            content += " "
+            content += " " # If there is text, add a space before the placeholder.
         content += "[O usuário enviou uma imagem]"
 
     return {
@@ -212,7 +213,7 @@ def message_to_cache_data(message: discord.Message) -> dict:
     }
 
 async def resolve_redirect_url(session, url):
-    """Resolve a URL final de um redirecionamento sem seguir."""
+    """Resolves the final URL of a redirect without following it."""
     try:
         async with session.head(url, allow_redirects=False, timeout=5) as response:
             if response.status in (301, 302, 303, 307, 308) and 'Location' in response.headers:
@@ -224,13 +225,13 @@ async def resolve_redirect_url(session, url):
 
 atexit.register(save_cache)
 
-# Configuração dos Intents
+# Intents Configuration
 intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True
 intents.members = True
 
-# Inicialização do Bot (usando commands.Bot)
+# Bot Initialization (using commands.Bot)
 COMMAND_PREFIX = '!'
 bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 
@@ -241,12 +242,12 @@ load_knowledge_base()
 async def update_presence_from_history():
     """A background task that updates the bot's presence based on recent chat history."""
     try:
-        # 1. Find the most recently active channel from our cache
+        # 1. Find the most recently active channel from our cache (hardcoded for now)
         if not message_cache:
             print(colorama.Fore.YELLOW + "Presence Task: No message history available yet.")
             return
 
-        # Find the channel_id with the most recent 'last_updated' timestamp
+        # Find the channel_id with the most recent 'last_updated' timestamp (hardcoded for now)
         
         channel_deque = message_cache.get(1338318945458982982, deque()) # type: ignore
         context_messages = list(reversed(channel_deque))
@@ -258,7 +259,7 @@ async def update_presence_from_history():
         context_block = "\n".join(history_strings)
 
 
-        # 3. Create a specialized prompt for generating a status
+        # 3. Create a specialized prompt for generating a status.
         status_prompt = f"""
         Baseado no histórico de conversa a seguir, e nas suas instruções de sistema, gere um "Status" para o Bot no Discord
         O status deve descrever o que o bot está "fazendo" ou "pensando" de uma forma divertida e concisa (menos de 100 caracteres).
@@ -275,7 +276,7 @@ async def update_presence_from_history():
         Your creative status:
         """
 
-        # 4. Call the Gemini API
+        # 4. Call the Gemini API.
         response = await asyncio.get_event_loop().run_in_executor(
             None,
             generate_content_sync,
@@ -292,10 +293,10 @@ async def update_presence_from_history():
         )
 
         if response.text and response.text.strip():
-            # 5. Set the new presence
+            # 5. Set the new presence.
             status_text = response.text.strip().replace('"', '') # Clean up the response
             
-            # Truncate to Discord's limit just in case
+            # Truncate to Discord's limit just in case.
             if len(status_text) > 128:
                 status_text = status_text[:125] + "..."
 
@@ -311,10 +312,12 @@ async def update_presence_from_history():
 # This decorator ensures the task doesn't start until the bot is fully logged in.
 @update_presence_from_history.before_loop
 async def before_update_presence():
+    """Waits for the bot to be ready before starting the presence update loop."""
     await bot.wait_until_ready()
 
 @bot.event
 async def on_ready():
+    """Event handler that runs when the bot has successfully connected to Discord."""
     print(colorama.Fore.GREEN + f'Logged in as {bot.user}!') 
     print(colorama.Fore.CYAN + f'Message cache size set to: {GLOBAL_CACHE_SIZE}')
     general_count = sum(len(d) for d in knowledge_base.get("generalKnowledge", [])) # type: ignore
@@ -326,6 +329,16 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
+    """
+    Event handler that processes incoming messages.
+
+    This function is the main entry point for message handling. It does the following:
+    1. Processes bot commands.
+    2. Caches the incoming message.
+    3. Checks if the bot was mentioned or its name was used.
+    4. If mentioned, it constructs a prompt and calls the Gemini API.
+    5. Handles API retries, response formatting, and sending the reply to Discord.
+    """
     await bot.process_commands(message)
 
     if message.channel.id not in message_cache:
@@ -342,7 +355,7 @@ async def on_message(message):
     if message.author != bot.user:
         asyncio.get_event_loop().run_in_executor(None, save_cache) 
     
-    # Não processe se o autor da mensagem for o bot
+    # Do not process if the message author is the bot
     if message.author == bot.user:
         return
 
@@ -354,7 +367,7 @@ async def on_message(message):
 
     async with message.channel.typing():
         try:
-            t0 = time.monotonic() # Start total processing timer
+            t0 = time.monotonic() # Start total processing timer.
 
             channel_deque = message_cache.get(message.channel.id, deque())
             context_messages = list(channel_deque)
@@ -394,13 +407,13 @@ async def on_message(message):
             if message.attachments:
                 async with aiohttp.ClientSession() as session:
                     for attachment in message.attachments:
-                        # Verifique se o anexo é de um tipo de imagem comum
+                        # Check if the attachment is a common image type
                         if attachment.content_type and attachment.content_type.startswith('image/'):
                             try:
                                 async with session.get(attachment.url) as resp:
                                     if resp.status == 200:
                                         image_bytes = await resp.read()
-                                        # Converte os bytes da imagem para um objeto PIL Image
+                                        # Convert the image bytes to a PIL Image object
                                         pil_image = Image.open(io.BytesIO(image_bytes))
                                         prompt_parts.append(pil_image)
                                     else:
@@ -408,7 +421,7 @@ async def on_message(message):
                             except Exception as e:
                                 print(colorama.Fore.RED + f"Error processing image {attachment.url}: {e}")
 
-            # --- METRIC 1: Context & Prompt Build Time ---
+            # --- METRIC 1: Context & Prompt Build Time ---.
             t1 = time.monotonic()
             time_context = t1 - t0
 
@@ -424,7 +437,7 @@ async def on_message(message):
             )
 
             max_retries = 3
-            base_wait_time = 2  # Segundos para esperar na primeira tentativa
+            base_wait_time = 2  # Seconds to wait on the first try
 
             for attempt in range(max_retries):
                 response = None # Reset response for each attempt
@@ -436,11 +449,11 @@ async def on_message(message):
                         config,
                     )
                     
-                    # If we get a response, but it's empty, we treat it as a retryable error.
+                    # If we get a response, but it's empty, we treat it as a retryable error
                     if not response or not response.candidates:
                         raise ValueError("A resposta da API foi recebida, mas estava vazia.")
                     
-                    # If we have a valid response, break the loop and proceed.
+                    # If we have a valid response, break the loop and proceed
                     break
                 
                 except Exception as e:
@@ -454,12 +467,12 @@ async def on_message(message):
                     )
                     
                     if is_retryable and attempt < max_retries - 1:
-                        wait_time = base_wait_time * (2 ** attempt)  # Exponential backoff: 2s, 4s
+                        wait_time = base_wait_time * (2 ** attempt)  # Exponential backoff: 2s, 4s.
                         error_reason = "sobrecarga" if "503" in error_str else "um filtro de segurança" if "safety" in error_str else "a resposta"
                         await message.channel.send(f"tive um problema com {error_reason}, tentando de novo em {wait_time} segundos... ({attempt + 1}/{max_retries})")
                         await asyncio.sleep(wait_time)
                     else:
-                        # This is the final attempt or a non-retryable error
+                        # This is the final attempt or a non-retryable error.
                         await message.reply(f"desculpe, não consegui uma resposta do modelo. tentei {max_retries} vezes e não rolou. 😔 (erro: {e})")
                         return
 

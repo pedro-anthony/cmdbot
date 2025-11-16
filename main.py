@@ -8,7 +8,9 @@ import json
 import os
 import pickle
 import pytz
+import nacl
 import time
+
 
 from PIL import Image
 from collections import deque
@@ -40,7 +42,7 @@ LLM_CONTEXT_SIZE = GLOBAL_CACHE_SIZE
 
 message_cache = deque(maxlen=GLOBAL_CACHE_SIZE)
 
-knowledge_base = {"generalKnowledge": [], "memberSpecific": [], "emojis:": []} 
+knowledge_base = {"generalKnowledge": [], "memberSpecific": [], "emojis": []} 
 
 MODEL_NAME = 'gemini-2.5-flash' 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
@@ -230,6 +232,7 @@ intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True
 intents.members = True
+intents.voice_states = True
 
 # Bot Initialization (using commands.Bot)
 COMMAND_PREFIX = '!'
@@ -326,6 +329,26 @@ async def on_ready():
 
     if not update_presence_from_history.is_running():
         update_presence_from_history.start()
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    """Handles bot leaving voice channel if it's alone."""
+    if before.channel and not after.channel and member.id == bot.user.id:
+        # Bot was disconnected
+        return
+
+    if before.channel is None:
+        return
+
+    voice_client = discord.utils.get(bot.voice_clients, guild=before.channel.guild)
+    if voice_client and voice_client.channel == before.channel:
+        # Check if the bot is the only one left
+        if len(voice_client.channel.members) == 1 and voice_client.channel.members[0] == bot.user:
+            await asyncio.sleep(10) # Wait 10 seconds to see if someone rejoins
+            if len(voice_client.channel.members) == 1:
+                await voice_client.disconnect()
+                if bot.get_channel(voice_client.channel.id):
+                    await bot.get_channel(voice_client.channel.id).send("fui deixado sozinho e saí do canal. 😔")
 
 @bot.event
 async def on_message(message):
@@ -541,6 +564,8 @@ async def on_message(message):
 
         except Exception as e:
             await message.reply(f"An error occurred: {e}")
+
+
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)

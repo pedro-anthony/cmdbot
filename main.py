@@ -276,7 +276,7 @@ async def update_presence_from_history():
         {context_block}
         ---
 
-        Your creative status:
+        Seu status criativo:
         """
 
         # 4. Call the Gemini API.

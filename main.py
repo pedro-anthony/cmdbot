@@ -37,7 +37,7 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 CACHE_FILE = 'message_cache.pkl'
 KNOWLEDGE_FILE = 'knowledge.json'
 
-GLOBAL_CACHE_SIZE = 1000
+GLOBAL_CACHE_SIZE = 10000
 LLM_CONTEXT_SIZE = GLOBAL_CACHE_SIZE
 
 message_cache = deque(maxlen=GLOBAL_CACHE_SIZE)

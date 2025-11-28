@@ -34,6 +34,12 @@ load_dotenv()
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
+# Pricing for Gemini 1.5 Flash (USD per token) - as of Nov 2025
+# Based on prompts < 128k tokens
+PRICE_PER_INPUT_TOKEN = 0.000000075
+PRICE_PER_OUTPUT_TOKEN = 0.00000030
+USD_TO_BRL_RATE = 5.38 # Approximate rate for Nov 2025
+
 CACHE_FILE = 'message_cache.pkl'
 KNOWLEDGE_FILE = 'knowledge.json'
 
@@ -281,16 +287,17 @@ async def update_presence_from_history():
         # 4. Call the Gemini API.
         response = await asyncio.get_event_loop().run_in_executor(
             None,
-            generate_content_sync,
-            status_prompt,
-            types.GenerateContentConfig(
-                safety_settings = [
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.OFF),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.OFF),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.OFF),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.OFF)
-                ],
-                system_instruction=SYSTEM_PROMPT,
+            lambda: generate_content_sync(
+                contents=status_prompt,
+                config=types.GenerateContentConfig(
+                    safety_settings = [
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.OFF),
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.OFF),
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.OFF),
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.OFF)
+                    ],
+                    system_instruction=SYSTEM_PROMPT,
+                )
             )
         )
 
@@ -426,17 +433,6 @@ async def on_message(message):
             t1 = time.monotonic()
             time_context = t1 - t0
 
-            config = types.GenerateContentConfig(
-                safety_settings = [
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.OFF),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.OFF),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.OFF),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.OFF)
-                ],
-                tools = [{'google_search': {}}],
-                system_instruction=SYSTEM_PROMPT,
-            )
-
             max_retries = 3
             base_wait_time = 2  # Seconds to wait on the first try
 
@@ -444,10 +440,15 @@ async def on_message(message):
                 response = None # Reset response for each attempt
                 try:
                     response = await asyncio.get_event_loop().run_in_executor(
-                        None,
-                        generate_content_sync,
-                        prompt_parts,
-                        config,
+                        None, lambda: generate_content_sync(prompt_parts, config=types.GenerateContentConfig(
+                    safety_settings = [
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.OFF),
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.OFF),
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.OFF),
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.OFF)
+                    ],
+                    system_instruction=SYSTEM_PROMPT,
+                ))
                     )
                     
                     # If we get a response, but it's empty, we treat it as a retryable error
@@ -504,12 +505,26 @@ async def on_message(message):
                 t3 = time.monotonic()
                 time_processing = t3 - t2
                 
+                # Calculate cost
+                cost_footer = ""
+                print('metadata check')
+                if response.usage_metadata:
+                    print('metadata true')
+                    input_tokens = response.usage_metadata.prompt_token_count
+                    output_tokens = response.usage_metadata.candidates_token_count
+                    
+                    cost_usd = (input_tokens * PRICE_PER_INPUT_TOKEN) + (output_tokens * PRICE_PER_OUTPUT_TOKEN)
+                    cost_brl = cost_usd * USD_TO_BRL_RATE
+                    cost_footer = f" | Custo: R$ {cost_brl:.6f}"
+
+                print('metricks check')
                 metrics_line = f"\n-# API: {time_api:.2f}s"
+                metrics_line += cost_footer
                 footer_lines.append(metrics_line)
 
                 final_response_text = response_body
                 if footer_lines:
-                    final_response_text += "\n" + "".join(footer_lines)
+                    final_response_text += "\n" + "".join(footer_lines) # type: ignore
 
                 if len(final_response_text) <= 2000:
                     await message.reply(final_response_text)

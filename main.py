@@ -42,6 +42,7 @@ USD_TO_BRL_RATE = 5.38 # Approximate rate for Nov 2025
 
 CACHE_FILE = 'message_cache.pkl'
 KNOWLEDGE_FILE = 'knowledge.json'
+VOICE_STATE_FILE = 'voice_state.json'
 
 GLOBAL_CACHE_SIZE = 10000
 LLM_CONTEXT_SIZE = GLOBAL_CACHE_SIZE
@@ -49,6 +50,8 @@ LLM_CONTEXT_SIZE = GLOBAL_CACHE_SIZE
 message_cache = deque(maxlen=GLOBAL_CACHE_SIZE)
 
 knowledge_base = {"generalKnowledge": [], "memberSpecific": [], "emojis": []} 
+
+target_voice_channel_id = None
 
 MODEL_NAME = 'gemini-2.5-flash' 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
@@ -77,6 +80,28 @@ Sua tarefa é responder às perguntas dos usuários em um chat do Discord, consi
 - Dê prioridade ao uso de emojis personalizados da sua base de conhecimento para adicionar personalidade e contexto às suas respostas.
 </FORMATO>
 """
+
+def save_voice_state():
+    """Saves the target voice channel ID to a file."""
+    if target_voice_channel_id:
+        with open(VOICE_STATE_FILE, 'w') as f:
+            json.dump({'target_voice_channel_id': target_voice_channel_id}, f)
+    elif os.path.exists(VOICE_STATE_FILE):
+        os.remove(VOICE_STATE_FILE)
+
+def load_voice_state():
+    """Loads the target voice channel ID from a file."""
+    global target_voice_channel_id
+    if os.path.exists(VOICE_STATE_FILE):
+        try:
+            with open(VOICE_STATE_FILE, 'r') as f:
+                data = json.load(f)
+                target_voice_channel_id = data.get('target_voice_channel_id')
+                if target_voice_channel_id:
+                    print(colorama.Fore.YELLOW + f"Loaded target voice channel: {target_voice_channel_id}")
+        except Exception as e:
+            print(colorama.Fore.RED + f"Error loading voice state: {e}")
+
 
 def load_cache():
     """Loads the message cache (dictionary of deques) from the file."""
@@ -231,6 +256,7 @@ async def resolve_redirect_url(session, url):
         return url
 
 atexit.register(save_cache)
+atexit.register(save_voice_state)
 
 # Intents Configuration
 intents = discord.Intents.default()
@@ -245,6 +271,7 @@ bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 
 load_cache()
 load_knowledge_base()
+load_voice_state()
 
 @tasks.loop(minutes=20)
 async def update_presence_from_history():
@@ -324,6 +351,46 @@ async def before_update_presence():
     """Waits for the bot to be ready before starting the presence update loop."""
     await bot.wait_until_ready()
 
+@tasks.loop(minutes=1)
+async def keep_voice_alive():
+    """A background task to keep the bot connected to the voice channel and playing silence."""
+    if target_voice_channel_id is None:
+        return
+
+    channel = bot.get_channel(target_voice_channel_id)
+    if not channel:
+        print(colorama.Fore.RED + f"Keep-alive: Target channel {target_voice_channel_id} not found.")
+        return
+
+    vc = discord.utils.get(bot.voice_clients, guild=channel.guild)
+
+    # If bot is not in a voice channel in this guild, connect.
+    if vc is None:
+        try:
+            print(colorama.Fore.YELLOW + f"Keep-alive: Connecting to '{channel.name}'...")
+            vc = await channel.connect()
+        except Exception as e:
+            print(colorama.Fore.RED + f"Keep-alive: Failed to connect to {channel.name}: {e}")
+            return
+    # If bot is in the wrong channel, move it.
+    elif vc.channel.id != target_voice_channel_id:
+        try:
+            print(colorama.Fore.YELLOW + f"Keep-alive: Moving to '{channel.name}'...")
+            await vc.move_to(channel)
+        except Exception as e:
+            print(colorama.Fore.RED + f"Keep-alive: Failed to move to {channel.name}: {e}")
+            return
+    
+    # If we are connected and not playing, play silence
+    if not vc.is_playing():
+        print(colorama.Fore.CYAN + "Keep-alive: Playing silence to stay connected.")
+        vc.play(discord.FFmpegPCMAudio(source='-f lavfi -i anullsrc', options='-vn'))
+
+@keep_voice_alive.before_loop
+async def before_keep_voice_alive():
+    """Waits for the bot to be ready before starting the keep_voice_alive loop."""
+    await bot.wait_until_ready()
+
 @bot.event
 async def on_ready():
     """Event handler that runs when the bot has successfully connected to Discord."""
@@ -335,6 +402,9 @@ async def on_ready():
 
     if not update_presence_from_history.is_running():
         update_presence_from_history.start()
+
+    if target_voice_channel_id and not keep_voice_alive.is_running():
+        keep_voice_alive.start()
 
 @bot.event
 async def on_message(message):
@@ -558,6 +628,42 @@ async def on_message(message):
         except Exception as e:
             await message.reply(f"An error occurred: {e}")
 
+@bot.command(name='join', help='Faz o bot entrar no seu canal de voz atual e ficar 24/7.')
+async def join(ctx):
+    """Joins the voice channel of the command issuer and stays there."""
+    if not ctx.author.voice:
+        await ctx.send("você não está em um canal de voz.")
+        return
+
+    channel = ctx.author.voice.channel
+    global target_voice_channel_id
+    target_voice_channel_id = channel.id
+    save_voice_state()
+
+    if ctx.voice_client is not None:
+        await ctx.voice_client.move_to(channel)
+    else:
+        await channel.connect()
+    
+    await ctx.send(f"conectado em `{channel.name}`. vou ficar por aqui.")
+
+    if not keep_voice_alive.is_running():
+        keep_voice_alive.start()
+
+
+@bot.command(name='leave', help='Faz o bot sair do canal de voz.')
+async def leave(ctx):
+    """Makes the bot leave the voice channel."""
+    global target_voice_channel_id
+    if ctx.voice_client is not None:
+        await ctx.voice_client.disconnect()
+        await ctx.send("desconectado.")
+        target_voice_channel_id = None
+        save_voice_state()
+        if keep_voice_alive.is_running():
+            keep_voice_alive.cancel()
+    else:
+        await ctx.send("não estou em um canal de voz.")
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)

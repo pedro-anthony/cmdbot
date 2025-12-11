@@ -384,7 +384,7 @@ async def keep_voice_alive():
     # If we are connected and not playing, play silence
     if not vc.is_playing():
         print(colorama.Fore.CYAN + "Keep-alive: Playing silence to stay connected.")
-        vc.play(discord.FFmpegPCMAudio(source='-f lavfi -i anullsrc', options='-vn'))
+        vc.play(discord.FFmpegPCMAudio(source='anullsrc', before_options='-f lavfi', options='-vn'))
 
 @keep_voice_alive.before_loop
 async def before_keep_voice_alive():

@@ -51,7 +51,7 @@ message_cache = deque(maxlen=GLOBAL_CACHE_SIZE)
 
 knowledge_base = {"generalKnowledge": [], "memberSpecific": [], "emojis": []} 
 
-target_voice_channel_id = None
+target_voice_channel_id = 1443731891399168071
 
 MODEL_NAME = 'gemini-2.5-flash' 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)

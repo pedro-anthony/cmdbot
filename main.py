@@ -44,7 +44,7 @@ CACHE_FILE = 'message_cache.pkl'
 KNOWLEDGE_FILE = 'knowledge.json'
 VOICE_STATE_FILE = 'voice_state.json'
 
-GLOBAL_CACHE_SIZE = 10000
+GLOBAL_CACHE_SIZE = 1500
 LLM_CONTEXT_SIZE = GLOBAL_CACHE_SIZE
 
 message_cache = deque(maxlen=GLOBAL_CACHE_SIZE)

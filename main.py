@@ -630,42 +630,5 @@ async def on_message(message):
         except Exception as e:
             await message.reply(f"An error occurred: {e}")
 
-@bot.command(name='join', help='Faz o bot entrar no seu canal de voz atual e ficar 24/7.')
-async def join(ctx):
-    """Joins the voice channel of the command issuer and stays there."""
-    if not ctx.author.voice:
-        await ctx.send("você não está em um canal de voz.")
-        return
-
-    channel = ctx.author.voice.channel
-    global target_voice_channel_id
-    target_voice_channel_id = channel.id
-    save_voice_state()
-
-    if ctx.voice_client is not None:
-        await ctx.voice_client.move_to(channel)
-    else:
-        await channel.connect(self_mute=True, self_deaf=True)
-    
-    await ctx.send(f"conectado em `{channel.name}`. vou ficar por aqui.")
-
-    if not keep_voice_alive.is_running():
-        keep_voice_alive.start()
-
-
-@bot.command(name='leave', help='Faz o bot sair do canal de voz.')
-async def leave(ctx):
-    """Makes the bot leave the voice channel."""
-    global target_voice_channel_id
-    if ctx.voice_client is not None:
-        await ctx.voice_client.disconnect()
-        await ctx.send("desconectado.")
-        target_voice_channel_id = None
-        save_voice_state()
-        if keep_voice_alive.is_running():
-            keep_voice_alive.cancel()
-    else:
-        await ctx.send("não estou em um canal de voz.")
-
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)

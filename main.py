@@ -351,6 +351,10 @@ async def before_update_presence():
     """Waits for the bot to be ready before starting the presence update loop."""
     await bot.wait_until_ready()
 
+@tasks.loop(minutes=15)
+async def keep_chat_alive():
+    """A background task that will watch the channel for inactivity and try to query the """
+
 @tasks.loop(minutes=1)
 async def keep_voice_alive():
     """A background task to keep the bot connected to the voice channel and playing silence."""
@@ -380,11 +384,9 @@ async def keep_voice_alive():
         except Exception as e:
             print(colorama.Fore.RED + f"Keep-alive: Failed to move to {channel.name}: {e}")
             return
-    
-    # If we are connected and not playing, play silence
-    if not vc.is_playing():
-        print(colorama.Fore.CYAN + "Keep-alive: Playing silence to stay connected.")
-        vc.play(discord.FFmpegPCMAudio(source='anullsrc', before_options='-f lavfi', options='-vn'))
+    else:
+        print("Bot already in the correct channel.")
+        
 
 @keep_voice_alive.before_loop
 async def before_keep_voice_alive():
